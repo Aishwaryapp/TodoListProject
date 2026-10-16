@@ -1,5 +1,4 @@
 
-import sqlite3
 import pytest
 
 from app import app, get_db, init_db
@@ -10,23 +9,24 @@ def client(tmp_path):
     old_database = app.config.get("DATABASE")
     old_testing = app.config.get("TESTING")
 
-    app.config["DATABASE"] = tmp_path / "test_tasks.db"
+    app.config["DATABASE"] = str(tmp_path / "test_tasks.db")
     app.config["TESTING"] = True
 
-    init_db()
+    try:
+        init_db()
 
-    with app.test_client() as test_client:
-        yield test_client
+        with app.test_client() as test_client:
+            yield test_client
+    finally:
+        if old_database is None:
+            app.config.pop("DATABASE", None)
+        else:
+            app.config["DATABASE"] = old_database
 
-    if old_database is None:
-        app.config.pop("DATABASE", None)
-    else:
-        app.config["DATABASE"] = old_database
-
-    if old_testing is None:
-        app.config.pop("TESTING", None)
-    else:
-        app.config["TESTING"] = old_testing
+        if old_testing is None:
+            app.config.pop("TESTING", None)
+        else:
+            app.config["TESTING"] = old_testing
 
 
 def register_and_login(client):
@@ -92,7 +92,6 @@ def test_complete_task(client):
         f"/toggle/{task['id']}",
         follow_redirects=True,
     )
-
     assert response.status_code == 200
 
     with get_db() as db:
@@ -148,11 +147,11 @@ def test_undo_completion(client):
     assert task is not None
 
     client.post(f"/toggle/{task['id']}")
+
     response = client.post(
         f"/toggle/{task['id']}",
         follow_redirects=True,
     )
-
     assert response.status_code == 200
 
     with get_db() as db:
